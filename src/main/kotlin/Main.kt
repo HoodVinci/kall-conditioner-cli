@@ -29,13 +29,12 @@ fun main(args: Array<String>) {
         shortName = "H",
         description = "header for the request expected format key1:value1 "
     ).default("")
-    // val headers = mapOf("x-token" to "0cbe991e-18ac-4635-ad7f-773257c63797")
 
     parser.parse(args)
 
     networkConditioners.forEach { (profile, conditioner) ->
         printLineSep()
-        println("network conditions : $profile")
+        println("$nbOfCalls on $profile conditions  ")
         batchRequest(conditioner, nbOfCalls, url, serializedHeaders.parseHeaders())
     }
 }
@@ -46,7 +45,6 @@ private fun String.parseHeaders(): Map<String, String> =
             val pair = split(":")
             pair[0] to pair[1]
         }
-        .also { println("SHEH $it") }
 
 private fun batchRequest(
     throttler: Throttler,
@@ -61,9 +59,7 @@ private fun batchRequest(
     val size = allMetadata.map { it.size }.average().formatToKb()
     val duration = allMetadata.map { it.duration }.average().milliseconds
 
-    println("Made  $nbOfCalls request to $url")
-    println("Average size : $size")
-    println("Average time : $duration")
+    println("Average size : $size time : $duration")
 
 }
 
