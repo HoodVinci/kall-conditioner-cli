@@ -40,11 +40,10 @@ fun main(args: Array<String>) {
 }
 
 private fun String.parseHeaders(): Map<String, String> =
-
-        associate {
-            val pair = split(":")
-            pair[0] to pair[1]
-        }
+    associate {
+        val pair = split(":")
+        pair[0] to pair[1]
+    }
 
 private fun batchRequest(
     throttler: Throttler,
@@ -53,7 +52,8 @@ private fun batchRequest(
     headers: Map<String, String>
 ) {
     val client: OkHttpClient = createClient(throttler)
-    val allMetadata = (0 until nbOfCalls).map { client.makeRequest(url, headers).toMetadata() }
+    val allMetadata = (0 until nbOfCalls)
+        .map { client.makeRequest(url, headers).toMetadata() }
         .filter { it.httpCode == 200 }
 
     val size = allMetadata.map { it.size }.average().formatToKb()
@@ -65,17 +65,11 @@ private fun batchRequest(
 
 private fun createClient(throttler: Throttler) = OkHttpClient().newBuilder()
     .addInterceptor { chain ->
-        val request = chain.request()
-        val originalRequestBody = request.body
-        val newRequest = if (originalRequestBody != null) {
-            val wrappedRequestBody = ThrottledRequestBody(originalRequestBody, throttler)
-            request.newBuilder()
-                .method(request.method, wrappedRequestBody)
-                .build()
-        } else {
-            request
-        }
-        chain.proceed(newRequest)
+        val originalResponse = chain.proceed(chain.request())
+        val originalBody = originalResponse.body ?: return@addInterceptor originalResponse
+        originalResponse.newBuilder()
+            .body(ThrottledResponseBody(originalBody, throttler))
+            .build()
     }
     .build()
 
@@ -96,11 +90,15 @@ private fun buildRequest(
     return requestBuilder
 }
 
-private fun Response.toMetadata() = ResponseMetadata(
-    duration = (receivedResponseAtMillis - sentRequestAtMillis),
-    size = body?.contentLength() ?: -1,
-    httpCode = code
-)
+private fun Response.toMetadata(): ResponseMetadata {
+    // consume stream, let the bandwidth limit slow the process
+    body?.string()
+    return ResponseMetadata(
+        duration = (System.currentTimeMillis() - sentRequestAtMillis),
+        size = body?.contentLength() ?: -1,
+        httpCode = code
+    )
+}
 
 private fun printLineSep() = println("-".repeat(80))
 
